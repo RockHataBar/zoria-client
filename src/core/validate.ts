@@ -42,10 +42,15 @@ export function checkPassword(p: string): string | null {
   return null;
 }
 
+/** Довгий код у листі переноситься по рядках: пробіли, переведення рядка і невидимі знаки при копіюванні прибираємо. */
+export function normalizeInvitation(raw: string): string {
+  return raw.replace(/[\s​-‍⁠﻿]+/g, '');
+}
+
 export function checkInvitation(raw: string): string | null {
-  const c = raw.trim();
+  const c = normalizeInvitation(raw);
   if (!c) return 'Вкажіть код заявки з листа або з бота @zoria_net_bot.';
-  if (chars(c) > 100) return 'Код заявки задовгий - перевірте, що скопійовано тільки код.';
+  if (chars(c) > 100) return 'Код заявки задовгий (понад 100 знаків) - перевірте, що скопійовано тільки код, без посилання чи тексту листа.';
   return null;
 }
 
@@ -123,7 +128,7 @@ export function registerBody(a: Application): Record<string, string> {
     username: normalizeUsername(a.username),
     displayName: a.displayName.trim(),
     password: a.password,
-    invitation: a.invitation.trim(),
+    invitation: normalizeInvitation(a.invitation),
     repositoryUrl: repo.ok ? repo.slug : a.repositoryUrl.trim(),
     lang: a.lang,
   };

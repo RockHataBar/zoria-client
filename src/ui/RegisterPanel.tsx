@@ -2,7 +2,7 @@ import { useApp, useNow } from '../app/context.tsx';
 import { useRegistration } from '../app/registration.tsx';
 import { msUntilOpen, registrationOpen, toLocalMs } from '../core/ether.ts';
 import { fmtDuration } from '../core/time.ts';
-import { normalizeUsername, parseRepository } from '../core/validate.ts';
+import { normalizeInvitation, normalizeUsername, parseRepository } from '../core/validate.ts';
 import { Field, Time } from './common.tsx';
 
 export function RegisterPanel() {
@@ -77,7 +77,17 @@ export function RegisterPanel() {
             onChange={(ev) => reg.setDraft({ password: ev.target.value })}
           />
         </Field>
-        <Field label="Код заявки (invitation)" error={e.invitation} hint="Одноразовий і лише ваш: не передавайте його нікому.">
+        <Field
+          label="Код заявки (invitation)"
+          error={e.invitation}
+          hint={
+            <>
+              Одноразовий і лише ваш: не передавайте його нікому. Вставте скопійований код повністю; пробіли і переведення рядка всередині
+              прибираються самі.
+              {normalizeInvitation(draft.invitation) && <> Довжина коду: {[...normalizeInvitation(draft.invitation)].length} знаків (не більше 100).</>}
+            </>
+          }
+        >
           <input
             name="invitation"
             autoComplete="off"

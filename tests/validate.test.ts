@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkDisplayName, checkPassword, checkUsername, parseRepository, registerBody } from '../src/core/validate.ts';
+import { checkDisplayName, checkInvitation, checkPassword, checkUsername, normalizeInvitation, parseRepository, registerBody } from '../src/core/validate.ts';
 
 describe('репозиторій (CL-14)', () => {
   const ok = [
@@ -58,6 +58,13 @@ describe('поля заявки (5.6)', () => {
     expect(checkDisplayName('   ')).not.toBeNull();
     expect(checkDisplayName('a\tb')).not.toBeNull();
     expect(checkDisplayName('я'.repeat(81))).not.toBeNull();
+  });
+  it('довгий код із листа: переноси рядків і пробіли всередині прибираються', () => {
+    const code = 'Ab3_' + 'x'.repeat(60) + '-9Z';
+    expect(normalizeInvitation(`  ${code.slice(0, 30)}\n${code.slice(30, 50)} ​${code.slice(50)}\r\n`)).toBe(code);
+    expect(checkInvitation(code)).toBeNull();
+    expect(checkInvitation('y'.repeat(101))).not.toBeNull();
+    expect(checkInvitation(' \n ')).not.toBeNull();
   });
   it('пароль: 12-256 знаків', () => {
     expect(checkPassword('correct-horse')).toBeNull();

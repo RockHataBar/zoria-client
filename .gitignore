@@ -7,3 +7,6 @@ dist/
 .env.*.local
 *.local.json
 .zoria-session*
+
+# Локальні налаштування Claude Code
+.claude/

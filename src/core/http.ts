@@ -76,10 +76,12 @@ export function apiError(res: HttpResponse): ApiError | null {
 
 // ---- Глушіння (CL-07): після 429 jammed жодного запиту цьому серверу до кінця Retry-After ----
 
+// Ліміт рахується за адресою, тож строк глушіння спільний для всіх вкладок цього браузера
+// і переживає перезавантаження сторінки: він лежить і в пам'яті, і в сховищі браузера.
 const gates = new Map<string, number>();
 const gateListeners = new Set<() => void>();
 
-function hostOf(base: string): string {
+export function hostOf(base: string): string {
   try {
     return new URL(base).host;
   } catch {
@@ -87,9 +89,20 @@ function hostOf(base: string): string {
   }
 }
 
+const silenceKey = (host: string) => `zoria:silence:${host}`;
+
+function sharedUntil(host: string): number {
+  try {
+    return typeof localStorage === 'undefined' ? 0 : Number(localStorage.getItem(silenceKey(host))) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** Скільки ще мовчати перед цим сервером, мс. */
 export function silenceRemainingMs(base: string, now = Date.now()): number {
-  const until = gates.get(hostOf(base)) ?? 0;
+  const host = hostOf(base);
+  const until = Math.max(gates.get(host) ?? 0, sharedUntil(host));
   return Math.max(0, until - now);
 }
 
@@ -98,12 +111,24 @@ export function onSilenceChange(fn: () => void): () => void {
   return () => gateListeners.delete(fn);
 }
 
+if (typeof window !== 'undefined') {
+  // глушіння, яке помітила інша вкладка
+  window.addEventListener('storage', (e) => {
+    if (e.key?.startsWith('zoria:silence:')) gateListeners.forEach((fn) => fn());
+  });
+}
+
 export function noteSilence(base: string, seconds: number, now = Date.now()): void {
-  const key = hostOf(base);
+  const host = hostOf(base);
   // +1 с запасу: запит в останню секунду глушіння все одно отримує 429
   const until = now + Math.max(1, seconds) * 1000 + 1000;
-  if (until > (gates.get(key) ?? 0)) {
-    gates.set(key, until);
+  if (until > Math.max(gates.get(host) ?? 0, sharedUntil(host))) {
+    gates.set(host, until);
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(silenceKey(host), String(until));
+    } catch {
+      /* сховище недоступне - строк лишається в пам'яті */
+    }
     gateListeners.forEach((fn) => fn());
   }
 }

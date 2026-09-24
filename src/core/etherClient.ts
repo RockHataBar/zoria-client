@@ -2,7 +2,7 @@
 // ніж раз на хвилину, повтори збоїв із джитером (CL-04, CL-08, CL-09). Працює в браузері й у Node.
 import { applyNoise, applySignal, initialEther, type EtherState } from './ether.ts';
 import { asConfig } from './guards.ts';
-import { backoffDelay, httpRequest, isAbort, onSilenceChange, sleep, type HttpResponse } from './http.ts';
+import { backoffDelay, hostOf, httpRequest, isAbort, onSilenceChange, sleep, type HttpResponse } from './http.ts';
 import { acceptKey, checkEnvelope, envelopeShape, type VerifiedKey } from './seal.ts';
 import type { Config } from './types.ts';
 
@@ -14,6 +14,32 @@ export interface EtherSnapshot {
   /** Останній запит /ether: коли і чим скінчився (для показу). */
   last: { at: number; outcome: 'signal' | 'noise' | 'failure' | 'jammed'; status: number; requestId: string | null } | null;
   running: boolean;
+  /**
+   * leader - ця вкладка слухає ефір; follower - слухає інша вкладка цього браузера, кадри приходять
+   * від неї (печатка перевіряється тут); solo - без координації (Node, старий браузер).
+   */
+  role: 'leader' | 'follower' | 'solo';
+}
+
+type PeerMessage =
+  | { t: 'env'; json: unknown; receivedAt: number; status: number; requestId: string | null }
+  | { t: 'config'; config: Config }
+  | { t: 'roll'; until: number };
+
+function sharedNumber(key: string): number {
+  try {
+    return typeof localStorage === 'undefined' ? 0 : Number(localStorage.getItem(key)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setSharedNumber(key: string, v: number): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, String(v));
+  } catch {
+    /* сховище недоступне */
+  }
 }
 
 export interface EtherClientOptions {
@@ -48,7 +74,12 @@ export function createEtherClient(o: EtherClientOptions) {
   let lastRollReq = 0;
   let lastConfigReq = 0;
   let rollInterest = 0;
+  let remoteRollUntil = 0;
   let wake: (() => void) | null = null;
+  let role: EtherSnapshot['role'] = 'solo';
+  let channel: BroadcastChannel | null = null;
+  const host = hostOf(o.base);
+  const lastEtherKey = `zoria:lastEther:${host}`;
 
   const listeners = new Set<() => void>();
   let snapshot: EtherSnapshot = build();
@@ -61,7 +92,36 @@ export function createEtherClient(o: EtherClientOptions) {
       config,
       last,
       running: ctrl !== null,
+      role,
     };
+  }
+
+  function post(m: PeerMessage) {
+    try {
+      channel?.postMessage(m);
+    } catch {
+      /* канал закрито */
+    }
+  }
+
+  /** Кадр, який отримала вкладка-слухач: печатку перевіряємо самі. */
+  async function onPeer(m: PeerMessage) {
+    if (m.t === 'roll') {
+      remoteRollUntil = Math.max(remoteRollUntil, m.until);
+      if (role === 'leader' && Date.now() - lastRollReq >= rollMs) wake?.();
+      return;
+    }
+    if (role === 'leader') return;
+    if (m.t === 'config') {
+      config = m.config;
+      state = { ...state, configSaysOpen: m.config.registrationOpen };
+      emit();
+      return;
+    }
+    if (!key) return;
+    const outcome = await accept(m.json, m.receivedAt);
+    last = { at: m.receivedAt, outcome, status: m.status, requestId: m.requestId };
+    emit();
   }
 
   function emit() {
@@ -130,6 +190,7 @@ export function createEtherClient(o: EtherClientOptions) {
       log(`429: мовчимо ${res.retryAfterSec ?? '?'} с`);
       return;
     }
+    if (envelopeShape(res.json)) post({ t: 'env', json: res.json, receivedAt: res.receivedAt, status: res.status, requestId: res.requestId });
     const outcome = await accept(res.json, res.receivedAt);
     if (outcome === 'signal') failures = 0;
     else if (res.status >= 500 && !envelopeShape(res.json)) failures++;
@@ -141,6 +202,7 @@ export function createEtherClient(o: EtherClientOptions) {
     const res = await req('/public/config', signal);
     if (res.failure || res.status === 429) return;
     if (envelopeShape(res.json)) {
+      post({ t: 'env', json: res.json, receivedAt: res.receivedAt, status: res.status, requestId: res.requestId });
       await accept(res.json, res.receivedAt);
       return;
     }
@@ -149,6 +211,7 @@ export function createEtherClient(o: EtherClientOptions) {
       if (c) {
         config = c;
         state = { ...state, configSaysOpen: c.registrationOpen };
+        post({ t: 'config', config: c });
       }
     }
   }
@@ -157,6 +220,7 @@ export function createEtherClient(o: EtherClientOptions) {
     lastRollReq = Date.now();
     const res = await req('/ether/roll', signal);
     if (res.failure || res.status === 429) return;
+    if (envelopeShape(res.json)) post({ t: 'env', json: res.json, receivedAt: res.receivedAt, status: res.status, requestId: res.requestId });
     await accept(res.json, res.receivedAt);
   }
 
@@ -185,8 +249,13 @@ export function createEtherClient(o: EtherClientOptions) {
           await pause(Math.max(5_000, backoffDelay(failures, random)), signal);
           continue;
         }
+        // 15 с між запитами /ether - спільні для вкладок і перезавантажень цього браузера
+        const gap = sharedNumber(lastEtherKey) + pollMs - Date.now();
+        if (Date.now() >= nextEtherAt && gap > 0) nextEtherAt = Date.now() + gap;
         if (Date.now() >= nextEtherAt) {
+          setSharedNumber(lastEtherKey, Date.now());
           const res = await req('/ether', signal);
+          setSharedNumber(lastEtherKey, Date.now());
           await handle(res);
           emit();
           const delay = Math.max(pollMs + random() * 2_000, failures > 0 ? backoffDelay(failures, random) : 0);
@@ -202,7 +271,7 @@ export function createEtherClient(o: EtherClientOptions) {
             emit();
           }
         }
-        if (rollInterest > 0 && Date.now() - lastRollReq >= rollMs) {
+        if ((rollInterest > 0 || Date.now() < remoteRollUntil) && Date.now() - lastRollReq >= rollMs) {
           await pause(1_000 + random() * 2_000, signal);
           await refreshRoll(signal);
           emit();
@@ -222,7 +291,42 @@ export function createEtherClient(o: EtherClientOptions) {
     }
   }
 
+  /** Вкладка, що не слухає ефір сама: потрібен тільки ключ, щоб перевіряти чужі кадри. */
+  async function followerKey(signal: AbortSignal): Promise<void> {
+    let n = 0;
+    while (!key && !signal.aborted && role === 'follower') {
+      if (await loadKey(signal).catch(() => false)) break;
+      emit();
+      await sleep(Math.max(5_000, backoffDelay(++n, random)), signal).catch(() => {});
+    }
+    emit();
+  }
+
   let unsubSilence: (() => void) | null = null;
+  let rollTimer: ReturnType<typeof setInterval> | null = null;
+
+  function startCoordinated(signal: AbortSignal): boolean {
+    const locks = typeof window !== 'undefined' && typeof navigator !== 'undefined' ? navigator.locks : undefined;
+    if (!locks || typeof BroadcastChannel === 'undefined') return false;
+    const name = `zoria-ether:${host}`;
+    channel = new BroadcastChannel(name);
+    channel.onmessage = (e: MessageEvent<PeerMessage>) => void onPeer(e.data);
+    role = 'follower';
+    void followerKey(signal);
+    // Ліміт ефіру - на адресу: слухає одна вкладка, решта отримують її кадри.
+    locks
+      .request(name, { signal }, async () => {
+        role = 'leader';
+        log('ця вкладка слухає ефір');
+        emit();
+        await loop(signal);
+      })
+      .catch(() => {});
+    rollTimer = setInterval(() => {
+      if (role === 'follower' && rollInterest > 0) post({ t: 'roll', until: Date.now() + 75_000 });
+    }, 30_000);
+    return true;
+  }
 
   return {
     base: o.base,
@@ -230,14 +334,22 @@ export function createEtherClient(o: EtherClientOptions) {
       if (ctrl) return;
       ctrl = new AbortController();
       unsubSilence = onSilenceChange(emit);
+      if (!startCoordinated(ctrl.signal)) {
+        role = 'solo';
+        void loop(ctrl.signal);
+      }
       emit();
-      void loop(ctrl.signal);
     },
     stop() {
       ctrl?.abort();
       ctrl = null;
       unsubSilence?.();
       unsubSilence = null;
+      if (rollTimer) clearInterval(rollTimer);
+      rollTimer = null;
+      channel?.close();
+      channel = null;
+      role = 'solo';
       emit();
     },
     subscribe(fn: () => void): () => void {
@@ -250,6 +362,7 @@ export function createEtherClient(o: EtherClientOptions) {
     /** Інтерес до журналу: поки > 0, /ether/roll опитується не частіше ніж раз на хвилину. */
     wantRoll(on: boolean) {
       rollInterest = Math.max(0, rollInterest + (on ? 1 : -1));
+      if (on && role === 'follower') post({ t: 'roll', until: Date.now() + 75_000 });
       if (on && Date.now() - lastRollReq >= rollMs) wake?.();
     },
     /** Тіло з іншого маршруту у формі конверта (503 до просвіту) - теж кадр ефіру. */

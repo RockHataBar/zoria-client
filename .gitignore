@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+
+# Локальні налаштування і секрети: пароль, код заявки, токен сесії не потрапляють у репозиторій (CL-20, CL-41)
+.env.local
+.env.*.local
+*.local.json
+.zoria-session*

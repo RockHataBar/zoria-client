@@ -1,0 +1,32 @@
+{
+  "name": "zoria-client",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Клієнт мережі Зоря.нет (частина 1): ефір і печатка, реєстрація в просвіт, доступ до репозиторію, листи, новини, частини завдання",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p . && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run",
+    "watch": "node scripts/watch.ts"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^3.2.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.1"
+  }
+}

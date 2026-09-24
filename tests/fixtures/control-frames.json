@@ -1,0 +1,12 @@
+{
+  "note": "Контрольні кадри A-D і навчальний ключ зі специфікації клієнта, розділ 5.2 (редакція 24.09)",
+  "trainingKey": {
+    "publicKey": "GQgsc8G1w5aXEnExpTBE597_7acc0vGKMAT5wUW4L5g",
+    "fingerprint": "f3a436df65614f08635f18fe0f64f145285203f1faa2905ecb25ffb90969a7de",
+    "key": "f3a436df65614f08"
+  },
+  "A": "{\"frame\":\"{\\\"v\\\":1,\\\"kind\\\":\\\"signal\\\",\\\"station\\\":\\\"zoria\\\",\\\"at\\\":\\\"2026-09-24T03:00:00.000Z\\\",\\\"phase\\\":\\\"static\\\",\\\"window\\\":null,\\\"harbinger\\\":{\\\"opensIn\\\":21600,\\\"text\\\":{\\\"uk\\\":\\\"...тріск... у шумі несуча... слабка, рівна... хтось тримає канал...\\\",\\\"en\\\":\\\"...crackle... in the noise a carrier... weak, steady... someone holds the channel...\\\"}},\\\"fragment\\\":{\\\"n\\\":3,\\\"of\\\":12,\\\"text\\\":\\\"навчальний уривок\\\"},\\\"onAir\\\":0}\",\"seal\":\"t2-ZIAEPGX1ewl9lSsdg7WlnzofcyU68IYzVJ947iQcvoQzA3n6Uzcmuf1ixrC-O4gfp2NzGaORHZE48A0tdCA\",\"key\":\"f3a436df65614f08\"}",
+  "B": "{\"frame\":\"{\\\"v\\\":1,\\\"kind\\\":\\\"signal\\\",\\\"station\\\":\\\"zoria\\\",\\\"at\\\":\\\"2026-09-24T03:00:05.000Z\\\",\\\"phase\\\":\\\"window\\\",\\\"window\\\":{\\\"opensAt\\\":\\\"2026-09-24T02:40:00.000Z\\\",\\\"closesAt\\\":\\\"2026-09-24T13:10:00.000Z\\\"},\\\"harbinger\\\":null,\\\"fragment\\\":null,\\\"onAir\\\":17}\",\"seal\":\"tyynPbJxE4itFop4uKs0W9TL1CRfwHNZ3HHBFFknbihg4I403hmaEL9MDcboucrllUmeKvJQfr70eHKBPLJfAg\",\"key\":\"f3a436df65614f08\"}",
+  "C": "{\"frame\":\"{\\\"v\\\":1,\\\"kind\\\":\\\"signal\\\",\\\"station\\\":\\\"zoria\\\",\\\"at\\\":\\\"2026-09-24T03:00:00.000Z\\\",\\\"phase\\\":\\\"static\\\",\\\"",
+  "D": "{\"frame\":\"{\\\"v\\\":1,\\\"kind\\\":\\\"roll\\\",\\\"station\\\":\\\"zoria\\\",\\\"at\\\":\\\"2026-09-24T09:05:00.000Z\\\",\\\"phase\\\":\\\"window\\\",\\\"window\\\":{\\\"opensAt\\\":\\\"2026-09-24T09:00:00.000Z\\\",\\\"closesAt\\\":\\\"2026-09-24T19:00:00.000Z\\\"},\\\"harbinger\\\":null,\\\"fragment\\\":null,\\\"onAir\\\":2,\\\"roll\\\":[{\\\"n\\\":1,\\\"at\\\":\\\"2026-09-24T09:00:04.311Z\\\",\\\"sinceOpen\\\":4,\\\"name\\\":\\\"Північна вахта\\\"},{\\\"n\\\":2,\\\"at\\\":\\\"2026-09-24T09:01:30.020Z\\\",\\\"sinceOpen\\\":90,\\\"name\\\":\\\"Stitch\\\"}]}\",\"seal\":\"_y5ZQ4FXV2BUeuWxFXFAzVcg1ygpokZElCv-eQvT88JzAiPlUvJUg6wlKYTd-6Ihv9VFkbYlZCJmbb_aAQ9OAA\",\"key\":\"f3a436df65614f08\"}"
+}

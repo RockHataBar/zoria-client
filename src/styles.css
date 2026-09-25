@@ -399,6 +399,11 @@ button.link {
   color: var(--err);
 }
 
+details > summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
 .steps li {
   margin-bottom: 8px;
 }

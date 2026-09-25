@@ -36,6 +36,7 @@ export function AccessPanel() {
   const bot = access?.githubUsername ?? 'zoria-net-bot';
   const repo = acc.repository;
   const slug = repo ? repo.url.replace(/^https:\/\/github\.com\//, '') : null;
+  const verified = repo?.accessStatus === 'verified';
 
   return (
     <section className="panel">
@@ -78,7 +79,19 @@ export function AccessPanel() {
       </div>
 
       <div className="card">
-        <h3>Що зробити</h3>
+        {verified ? (
+          <>
+            <h3>Усе зроблено</h3>
+            <p className="ok">
+              Запрошення прийнято, файл .zoria називає ваш акаунт. Робити нічого не треба - тільки тримати доступ до кінця конкурсу: репозиторій
+              лишається приватним, запрошення не відкликати, .zoria не видаляти.
+            </p>
+          </>
+        ) : (
+          <h3>Що зробити</h3>
+        )}
+        <details open={!verified}>
+          <summary>{verified ? 'Інструкція для довідки' : 'Кроки'}</summary>
         <ol className="steps">
           <li>
             Репозиторій має лишатися <strong>приватним</strong> до кінця конкурсу: не відкривати, не видаляти, не перейменовувати, не передавати.
@@ -107,7 +120,8 @@ export function AccessPanel() {
           {access?.instructions && <li>Від організаторів: {access.instructions}</li>}
           <li>За кілька хвилин статус стане «verified», прийде лист. Строк підтвердження - у календарі (2026-10-05 21:00).</li>
         </ol>
-        {!access && <p className="muted">Акаунт для запрошення взято з ТЗ; /public/config ще не прочитано.</p>}
+        </details>
+        {!access &&<p className="muted">Акаунт для запрошення взято з ТЗ; /public/config ще не прочитано.</p>}
       </div>
 
       <div className="card">

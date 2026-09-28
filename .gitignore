@@ -10,3 +10,4 @@ dist/
 
 # Локальні налаштування Claude Code
 .claude/
+.zoria-registry*

@@ -1,6 +1,9 @@
 import { BlankBot } from '@zoria/sdk';
 import type { BeliefFrame } from '@zoria/sdk';
+import { decodeVerdicts } from '@zoria/protocol';
 import type { ClsName, Hex, Observe, Order, SlotName } from '@zoria/protocol';
+
+const HARD_DENY = new Set([11, 12, 13, 21]);
 
 export interface Strategy {
   init(manifestBytes: Uint8Array, slot: SlotName): void;
@@ -26,8 +29,40 @@ class ExpansionBot extends BlankBot implements Strategy {
   private blocked = new Map<string, number>();
   private lastYard = -100;
   private costTkach = 90;
+  private costNeedle = 60;
   private capWeight = 8;
   private linkRange = 5;
+  private center: Hex = { q: 0, r: 0 };
+  private buildable = new Set<string>();
+  private sent: Order[] = [];
+  private silent = 0;
+  private lastT = 0;
+
+  feedback(verdictBytes: Uint8Array): void {
+    const verdicts = decodeVerdicts(verdictBytes);
+    if (!verdicts || verdicts.length === 0) {
+      this.silent++;
+      return;
+    }
+    let accepted = 0;
+    for (const [i, ok, code] of verdicts) {
+      if (ok) {
+        accepted++;
+        continue;
+      }
+      if (!HARD_DENY.has(code)) continue;
+      const o = this.sent[i];
+      if (o && (o.kind === 'move' || o.kind === 'needle' || o.kind === 'feed')) {
+        this.blocked.set(key(o.q, o.r), this.lastT + 60);
+      }
+    }
+    this.silent = accepted > 0 ? 0 : this.silent + 1;
+  }
+
+  private isBlocked(k: string, t: number): boolean {
+    const until = this.blocked.get(k);
+    return until !== undefined && until > t;
+  }
 
   override init(manifestBytes: Uint8Array, slot: SlotName): void {
     super.init(manifestBytes, slot);
@@ -37,16 +72,62 @@ class ExpansionBot extends BlankBot implements Strategy {
     const seat = m.seats[idx];
     this.base = seat ?? SEATS[slot];
     this.costTkach = m.cfg['costTkach'] ?? 90;
+    this.costNeedle = m.cfg['costNeedle'] ?? 60;
     this.capWeight = m.cfg['squadWeight'] ?? 8;
     this.linkRange = m.cfg['linkRange'] ?? 5;
+    this.center = m.citadel;
     this.ruins = m.needles
       .filter((n) => n.start === null && !n.ring && !n.spoke)
       .map((n) => ({ q: n.q, r: n.r }))
       .sort((a, b) => dist(a, this.base) - dist(b, this.base));
+
+    const radius = m.terrain.radius - 1;
+    const blocked = new Set<string>();
+    for (const n of m.needles) blocked.add(key(n.q, n.r));
+    for (const f of m.finds) if (f.kind === 'dead') blocked.add(key(f.q, f.r));
+    const buildType = new Map<string, boolean>();
+    for (const c of m.terrain.cells) {
+      const type = m.terrain.types[c[2]];
+      buildType.set(key(c[0], c[1]), type ? type.build : false);
+    }
+    const bases = m.seats;
+    for (let q = -radius; q <= radius; q++) {
+      for (let r = -radius; r <= radius; r++) {
+        const h = { q, r };
+        if (dist(h, this.center) > radius) continue;
+        const k = key(q, r);
+        if (blocked.has(k)) continue;
+        if (!(buildType.get(k) ?? true)) continue;
+        if (bases.some((b) => dist(h, b) <= 2)) continue;
+        this.buildable.add(k);
+      }
+    }
+  }
+
+  private bridgeSite(ruin: Hex, anchors: Hex[], t: number, occupied: Set<string>): Hex | null {
+    let best: Hex | null = null;
+    let bestD = Infinity;
+    for (let dq = -this.linkRange; dq <= this.linkRange; dq++) {
+      for (let dr = -this.linkRange; dr <= this.linkRange; dr++) {
+        const h = { q: ruin.q + dq, r: ruin.r + dr };
+        if (dist(h, ruin) > this.linkRange || dist(h, ruin) === 0) continue;
+        const hk = key(h.q, h.r);
+        if (!this.buildable.has(hk) || this.isBlocked(hk, t) || occupied.has(hk)) continue;
+        const near = anchors.find((a) => dist(a, h) <= this.linkRange);
+        if (!near) continue;
+        const d = dist(h, this.base);
+        if (d < bestD) {
+          bestD = d;
+          best = h;
+        }
+      }
+    }
+    return best;
   }
 
   protected override think(obs: Observe): Order[] {
     const t = obs.t;
+    this.lastT = t;
     const orders: Order[] = [];
     const units = obs.mine.units;
 
@@ -80,6 +161,8 @@ class ExpansionBot extends BlankBot implements Strategy {
       if (!alive.has(id) || mine.has(target) || enemy.has(target)) this.assign.delete(id);
     }
     const taken = new Set(this.assign.values());
+    const occupied = new Set(units.map((u) => key(u.q, u.r)));
+    const feedClaim = new Set<string>();
 
     const candidates = this.ruins
       .filter((r) => {
@@ -129,11 +212,55 @@ class ExpansionBot extends BlankBot implements Strategy {
         continue;
       }
 
-      const onOwnLit = obs.mine.needles.find((n) => n.q === u.q && n.r === u.r && !n.dark && !n.fed);
-      if (onOwnLit) orders.push({ kind: 'feed', unit: u.id, q: u.q, r: u.r });
+      if (u.task?.site) continue;
+
+      if (obs.pulse.energy >= this.costNeedle + 30) {
+        let far: Hex | undefined;
+        for (const ruin of this.ruins) {
+          const k = key(ruin.q, ruin.r);
+          if (mine.has(k) || enemy.has(k) || taken.has(k) || this.isBlocked(k, t)) continue;
+          if (anchors.some((a) => dist(a, ruin) <= this.linkRange)) continue;
+          const d = Math.min(...anchors.map((a) => dist(a, ruin)));
+          if (d <= 2 * this.linkRange) {
+            far = ruin;
+            break;
+          }
+        }
+        if (far) {
+          const site = this.bridgeSite(far, anchors, t, occupied);
+          if (site && !taken.has(key(site.q, site.r))) {
+            taken.add(key(site.q, site.r));
+            orders.push({ kind: 'needle', unit: u.id, q: site.q, r: site.r });
+            continue;
+          }
+        }
+      }
+
+      const fed = u.task?.feed;
+      if (fed && fed.q === u.q && fed.r === u.r) continue;
+
+      const onHere = obs.mine.needles.find((n) => n.q === u.q && n.r === u.r && !n.dark && !n.fed);
+      if (onHere) {
+        orders.push({ kind: 'feed', unit: u.id, q: u.q, r: u.r });
+        feedClaim.add(here);
+        continue;
+      }
+
+      let best: (typeof obs.mine.needles)[number] | undefined;
+      for (const n of obs.mine.needles) {
+        if (n.dark || n.fed) continue;
+        const k = key(n.q, n.r);
+        if (feedClaim.has(k) || (occupied.has(k) && k !== here) || this.isBlocked(k, t)) continue;
+        if (!best || n.weight > best.weight || (n.weight === best.weight && dist(n, u) < dist(best, u))) best = n;
+      }
+      if (best) {
+        feedClaim.add(key(best.q, best.r));
+        orders.push({ kind: 'move', unit: u.id, q: best.q, r: best.r, goal: null, home: false });
+      }
     }
 
-    if (orders.length === 0) orders.push({ kind: 'watch', q: this.base.q, r: this.base.r, keep: 0 });
+    if (this.silent > 0 || orders.length === 0) orders.unshift({ kind: 'watch', q: this.base.q, r: this.base.r, keep: 0 });
+    this.sent = orders;
     return orders;
   }
 

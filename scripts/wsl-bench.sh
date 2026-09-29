@@ -7,4 +7,4 @@ cp "$SRC"/scripts/bench.mjs "$HOME/zbot/bench.mjs"
 cd "$HOME/zbot"
 export ZORIA_NPM_AUTH="$(node -p "require('/mnt/c/Users/426/.zoria-registry.json').auth")"
 npm run --silent build
-node bench.mjs "$1" "$2"
+node bench.mjs "$@"

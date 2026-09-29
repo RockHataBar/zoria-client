@@ -47,7 +47,7 @@ const beliefFile = env['ZARIA_BELIEF'] ?? '';
 const statusPort = Number(env['STATUS_PORT'] ?? '') || 0;
 const freeze = env['ZARIA_FREEZE'] === '1';
 
-let preset = env['ZARIA_PRESET'] || 'рівний';
+let preset = env['ZARIA_PRESET'] || presets()[0]!;
 let strategy = createStrategy(preset);
 
 /* знімок голови: усе, що про бій знає лише провід. Його читає службовий

@@ -83,7 +83,7 @@ function probe() {
         if (o.t === 1199) s.crown = o.mine.needles.filter((n) => n.weight > 1.01).length;
         for (const u of o.mine.units) if (u.mute) s.mute++;
         if (o.t % 200 === 0 || o.t === 1199) {
-          s.needles.push(o.mine.needles.length);
+          s.needles.push(o.mine.needles.length + '/' + o.mine.needles.filter((n) => n.weight > 1.01).length);
           s.energy.push(Math.round(o.pulse.energy));
           s.units.push(o.mine.units.map((u) => (u.cls === 'ткач' ? 'Т' : 'К')).join(''));
         }

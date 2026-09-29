@@ -1,5 +1,6 @@
 import { createEngine } from '@zoria/engine';
 import { ARCHETYPES, runPack } from '@zoria/sdk';
+import { NAKAZ_SAMPLES, createNakazSparring } from '@zoria/sdk/nakaz';
 import { createStrategy } from './dist/strategy.js';
 
 const rivals = process.argv[2] ? process.argv[2].split(',') : ['обхідник', 'рівний'];
@@ -9,6 +10,7 @@ const verbose = process.argv[5] === 'v';
 const first = Number(process.argv[6] || 2026);
 
 async function seat(name) {
+  if (name.startsWith('%')) return { bot: () => createNakazSparring(NAKAZ_SAMPLES[name.slice(1)]) };
   if (name.startsWith('@')) return { bot: () => createStrategy(name.slice(1)) };
   if (name.startsWith('^')) {
     const [dir, p] = name.slice(1).split(':');

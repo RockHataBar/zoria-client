@@ -28,9 +28,10 @@ interface Shape {
   wary: boolean;
   adapt: boolean;
   bid: boolean;
+  crown: boolean;
 }
 
-const BASE: Shape = { weavers: 3, blades: 2, reactive: false, steal: true, build: true, ring: true, hunt: 0, escort: false, raid: false, wary: false, adapt: false, bid: true };
+const BASE: Shape = { weavers: 3, blades: 2, reactive: false, steal: true, build: true, ring: true, hunt: 0, escort: false, raid: false, wary: false, adapt: false, bid: true, crown: true };
 
 const SHAPES: Record<string, Shape> = {
   warden: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: true, wary: true },
@@ -68,6 +69,8 @@ interface World {
   energy: number;
   dawnOn: boolean;
   free: boolean;
+  home: Hex[];
+  crowned: boolean;
 }
 
 const SEATS: Record<SlotName, Hex> = { A: { q: 6, r: -12 }, B: { q: 6, r: 6 }, C: { q: -12, r: 6 } };
@@ -137,6 +140,8 @@ class ExpansionBot extends BlankBot implements Strategy {
   private threat = -1000;
   private lastYard = -100;
   private buildIdle = 0;
+  private crownAt = -1000;
+  private crownLost = 0;
   private costTkach = 90;
   private costKlinok = 50;
   private costNeedle = 60;
@@ -366,9 +371,13 @@ class ExpansionBot extends BlankBot implements Strategy {
     const litKeys = new Set<string>();
     const anchors: Hex[] = [this.base];
     const cov = new Map<string, number>();
+    const home: Hex[] = [];
+    let crowned = false;
     for (const n of obs.mine.needles) {
       const k = key(n.q, n.r);
       mine.add(k);
+      if (n.weight > 1.01) crowned = true;
+      if (this.starts.has(k)) home.push({ q: n.q, r: n.r });
       if (n.weight >= 1) {
         litKeys.add(k);
         anchors.push({ q: n.q, r: n.r });
@@ -406,7 +415,33 @@ class ExpansionBot extends BlankBot implements Strategy {
       energy: obs.pulse.energy,
       dawnOn,
       free: dawnOn || obs.pulse.mercy,
+      home,
+      crowned,
     };
+  }
+
+  private crownSite(w: World, t: number, claimed: Set<string>): Hex | null {
+    let best: Hex | null = null;
+    let bs = -Infinity;
+    const seen = new Set<string>();
+    for (const s of w.home) {
+      around(s, this.linkRange + 1, (q, r) => {
+        const k = key(q, r);
+        if (seen.has(k)) return;
+        seen.add(k);
+        if (!this.buildable.has(k) || this.isBlocked(k, t) || w.occupied.has(k) || claimed.has(k)) return;
+        const h = { q, r };
+        let links = 0;
+        for (const x of w.home) if (this.linkOk(x, h)) links++;
+        if (!links) return;
+        const sc = links * 100 + this.gain(h, w.cov);
+        if (sc > bs) {
+          bs = sc;
+          best = h;
+        }
+      });
+    }
+    return best;
   }
 
   private siege(): boolean {
@@ -882,6 +917,30 @@ class ExpansionBot extends BlankBot implements Strategy {
       }
     }
 
+    const crowning = new Set<string>();
+    let crownKey = '';
+    if (w.crowned) this.crownLost = t;
+    if (this.shape.crown && !w.crowned && w.litKeys.size >= 12 && t - this.crownLost >= 20 && t - this.crownAt > 60 && t < this.ticks - 60 && free.length) {
+      const sites = new Set<string>();
+      let spent = 0;
+      for (const u of w.weavers) {
+        if (!u.task?.site) continue;
+        sites.add(key(u.task.site.q, u.task.site.r));
+        spent += this.costNeedle;
+      }
+      const site = w.energy - spent >= this.costNeedle ? this.crownSite(w, t, sites) : null;
+      if (site) {
+        let bi = 0;
+        for (let i = 1; i < free.length; i++) if (dist(free[i]!, site) < dist(free[bi]!, site)) bi = i;
+        const u = free[bi]!;
+        free.splice(bi, 1);
+        builds.push({ kind: 'needle', unit: u.id, q: site.q, r: site.r });
+        crowning.add(u.id);
+        crownKey = key(site.q, site.r);
+        this.crownAt = t;
+      }
+    }
+
     while (free.length) {
       let bu = -1;
       let bc: Cand | null = null;
@@ -916,11 +975,15 @@ class ExpansionBot extends BlankBot implements Strategy {
         committed += this.costNeedle;
       }
     }
+    if (crownKey) {
+      claimed.add(crownKey);
+      committed += this.costNeedle;
+    }
     const feedClaim = new Set<string>();
     for (const u of w.weavers) if (u.task?.feed) feedClaim.add(key(u.task.feed.q, u.task.feed.r));
 
     for (const u of w.weavers) {
-      if (u.wait > 0) continue;
+      if (u.wait > 0 || crowning.has(u.id)) continue;
       const here = key(u.q, u.r);
       const moving = (u.task?.path ?? 0) > 0;
       const target = this.assign.get(u.id);

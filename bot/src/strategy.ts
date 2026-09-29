@@ -25,20 +25,27 @@ interface Shape {
   hunt: number;
   escort: boolean;
   raid: boolean;
+  wary: boolean;
+  adapt: boolean;
+  bid: boolean;
 }
 
-const BASE: Shape = { weavers: 3, blades: 2, reactive: false, steal: true, build: true, ring: true, hunt: 0, escort: false, raid: false };
+const BASE: Shape = { weavers: 3, blades: 2, reactive: false, steal: true, build: true, ring: true, hunt: 0, escort: false, raid: false, wary: false, adapt: false, bid: true };
 
 const SHAPES: Record<string, Shape> = {
-  guard: { ...BASE },
-  hunter: { ...BASE, hunt: 1, escort: true },
-  pack: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true },
+  warden: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: true, wary: true },
+  sentinel: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: true, wary: true, adapt: true },
+  ranger: { ...BASE, weavers: 2, blades: 4, hunt: 2, escort: true, raid: true, wary: true, adapt: true },
+  calm: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: false, wary: true },
+  still: { ...BASE, weavers: 2, blades: 4, hunt: 0, escort: true, raid: true, wary: true },
+  homely: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: true, wary: true, steal: false },
   raider: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: true },
-  wolf: { ...BASE, weavers: 2, blades: 4, hunt: 2, escort: true },
+  guard: { ...BASE },
+  pack: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true },
   swarm: { ...BASE, weavers: 1, blades: 6, hunt: 2, escort: true, raid: true },
   expansion: { ...BASE, weavers: 4, blades: 0 },
 };
-const DEFAULT_SHAPE = 'raider';
+const DEFAULT_SHAPE = 'warden';
 
 interface Cand {
   k: string;
@@ -122,6 +129,11 @@ class ExpansionBot extends BlankBot implements Strategy {
   private since = new Map<string, number>();
   private blocked = new Map<string, number>();
   private hurt = new Map<string, number>();
+  private foeBlades = new Map<string, { h: Hex; t: number }>();
+  private deaths: { h: Hex; t: number }[] = [];
+  private foeSeen = new Map<string, { h: Hex; t: number; still: number }>();
+  private issued = new Map<string, { pos: string; dest: string; t: number }>();
+  private rammed: number[] = [];
   private threat = -1000;
   private lastYard = -100;
   private buildIdle = 0;
@@ -221,6 +233,15 @@ class ExpansionBot extends BlankBot implements Strategy {
     return g;
   }
 
+  private danger(h: Hex, w: World): number {
+    let d = 0;
+    for (const v of this.foeBlades.values()) if (dist(v.h, h) <= 5 + Math.min(4, this.lastT - v.t)) d++;
+    for (const x of this.deaths) if (dist(x.h, h) <= 5) d++;
+    if (!d) return 0;
+    for (const b of w.blades) if (dist(b, h) <= 2) return d / 3;
+    return d;
+  }
+
   private inZone(h: Hex, w: World): boolean {
     return dist(h, this.base) <= this.linkRange || (w.cov.get(key(h.q, h.r)) ?? 0) > 0;
   }
@@ -311,8 +332,26 @@ class ExpansionBot extends BlankBot implements Strategy {
         this.threat = t;
       } else if (ev.type === 'ram' && ev.tgt === me && ev.p !== 'K') {
         this.threat = t;
+        this.deaths.push({ h: { q: ev.q, r: ev.r }, t });
+        this.rammed.push(t);
+      } else if (ev.type === 'lost' && ev.p === me && ev.cls === TKACH && ev.why === 'таран' && this.shape.wary) {
+        around(ev, 1, (q, r) => {
+          const k = key(q, r);
+          if (this.sites.has(k)) this.blocked.set(k, Math.max(this.blocked.get(k) ?? 0, t + 150));
+        });
       }
     }
+    this.rammed = this.rammed.filter((x) => t - x <= 150);
+    for (const f of obs.foe) if (f.p !== me && f.p !== 'K' && f.cls === KLINOK) this.foeBlades.set(f.id, { h: { q: f.q, r: f.r }, t });
+    for (const f of obs.foe) {
+      if (f.p === me || f.p === 'K') continue;
+      const prev = this.foeSeen.get(f.id);
+      const still = prev && prev.t === t - 1 && prev.h.q === f.q && prev.h.r === f.r ? prev.still + 1 : 0;
+      this.foeSeen.set(f.id, { h: { q: f.q, r: f.r }, t, still });
+    }
+    for (const [id, v] of this.foeSeen) if (t - v.t > 3) this.foeSeen.delete(id);
+    for (const [id, v] of this.foeBlades) if (t - v.t > 12) this.foeBlades.delete(id);
+    this.deaths = this.deaths.filter((x) => t - x.t <= 50);
     for (const [k, until] of this.hurt) if (until <= t) this.hurt.delete(k);
     if (this.dawnAt && t >= this.dawnAt) {
       for (const k of this.ringKeys) {
@@ -370,33 +409,85 @@ class ExpansionBot extends BlankBot implements Strategy {
     };
   }
 
+  private siege(): boolean {
+    return this.shape.adapt && this.rammed.length >= 3;
+  }
+
+  private wantWeavers(): number {
+    return this.siege() ? Math.max(1, this.shape.weavers - 1) : this.shape.weavers;
+  }
+
   private wantBlades(t: number): number {
     if (!this.shape.blades) return 0;
-    if (!this.shape.reactive) return this.shape.blades;
-    return t - this.threat < 300 ? this.shape.blades : 0;
+    const n = this.siege() ? this.shape.blades + 2 : this.shape.blades;
+    if (!this.shape.reactive) return n;
+    return t - this.threat < 300 ? n : 0;
   }
 
   private yard(t: number, w: World, out: Order[]): void {
     if (t < this.lastYard + 6) return;
     const weavers = w.weavers.length;
     const blades = w.blades.length;
-    if (weavers < this.shape.weavers && w.weight + 2 <= this.capWeight && w.energy >= this.costTkach) {
-      out.push({ kind: 'yard', cls: TKACH });
-      this.lastYard = t;
-      w.energy -= this.costTkach;
-      return;
+    const want = this.wantBlades(t);
+    const first = this.shape.wary && t - this.threat < 200 ? Math.min(2, want) : 0;
+    const canWeaver = w.weight + 2 <= this.capWeight && w.energy >= this.costTkach;
+    const canBlade = w.weight + 1 <= this.capWeight && w.energy >= this.costKlinok;
+    let cls: ClsName | null = null;
+    if (weavers === 0) cls = canWeaver ? TKACH : null;
+    else if (blades < first) cls = canBlade ? KLINOK : null;
+    else if (weavers < this.wantWeavers()) cls = canWeaver ? TKACH : null;
+    else if (blades < want) cls = canBlade ? KLINOK : null;
+    if (!cls) return;
+    out.push({ kind: 'yard', cls });
+    this.lastYard = t;
+    w.energy -= cls === TKACH ? this.costTkach : this.costKlinok;
+  }
+
+  private bids(t: number, w: World, out: Order[]): void {
+    const m = this.manifest;
+    if (!m || !this.shape.bid) return;
+    m.lots.forEach((lot, i) => {
+      if (t !== lot.at - 1) return;
+      const { free, value, near } = this.lotWorth(lot.cells, w);
+      if (!free || !near || value < 30) return;
+      let committed = 0;
+      for (const u of w.weavers) if (u.task?.site) committed += this.costNeedle;
+      const amount = Math.min(240, Math.floor(w.energy - committed - 5));
+      if (amount < 60) return;
+      out.push({ kind: 'bid', lot: i, amount });
+    });
+  }
+
+  private lotWorth(cells: Hex[], w: World): { free: number; value: number; near: boolean } {
+    let free = 0;
+    let value = 0;
+    let near = false;
+    for (const c of cells) {
+      const k = key(c.q, c.r);
+      if (w.mine.has(k) || (this.known.get(k)?.o ?? null) !== null) continue;
+      free++;
+      value += this.gain(c, w.cov);
+      if (!near) for (const a of w.anchors) if (dist(a, c) <= 2 * this.linkRange) near = true;
     }
-    if (weavers >= this.shape.weavers && blades < this.wantBlades(t) && w.weight + 1 <= this.capWeight && w.energy >= this.costKlinok) {
-      out.push({ kind: 'yard', cls: KLINOK });
-      this.lastYard = t;
-      w.energy -= this.costKlinok;
+    return { free, value, near };
+  }
+
+  private lotSoon(t: number, w: World): boolean {
+    const m = this.manifest;
+    if (!m || !this.shape.bid) return false;
+    for (const lot of m.lots) {
+      if (lot.at <= t || lot.at > t + 40) continue;
+      const { free, value, near } = this.lotWorth(lot.cells, w);
+      if (free && near && value >= 30) return true;
     }
+    return false;
   }
 
   private reserve(t: number, w: World): number {
-    if (w.weavers.length < this.shape.weavers) return this.costTkach;
-    if (w.blades.length < this.wantBlades(t)) return this.costKlinok;
-    return 0;
+    const lot = this.lotSoon(t, w) ? 65 : 0;
+    if (w.weavers.length < this.wantWeavers()) return this.costTkach + lot;
+    if (w.blades.length < this.wantBlades(t)) return this.costKlinok + lot;
+    return lot;
   }
 
   private nearHurt(h: Hex): boolean {
@@ -415,7 +506,7 @@ class ExpansionBot extends BlankBot implements Strategy {
     for (const b of w.blades) if (b.task?.ram && busy.has(b.id)) chased.add(b.task.ram);
 
     const working: Hex[] = [];
-    if (this.shape.escort) {
+    if (this.shape.escort || this.shape.wary) {
       for (const u of w.weavers) {
         const a = this.assign.get(u.id);
         if ((a && a === key(u.q, u.r)) || u.task?.site) working.push(u);
@@ -427,11 +518,14 @@ class ExpansionBot extends BlankBot implements Strategy {
       const fk = key(f.q, f.r);
       let pri = 0;
       if (f.cls === TKACH && w.mine.has(fk)) pri = 3;
+      else if (f.cls === KLINOK && this.shape.wary && working.some((h) => dist(h, f) <= 3)) pri = 3;
       else if (f.cls === KLINOK && this.nearHurt(f)) pri = 2;
       else if (f.cls === KLINOK && working.some((h) => dist(h, f) <= 2)) pri = 2;
+      else if (f.cls === KLINOK && this.shape.wary && w.weavers.some((h) => dist(h, f) <= 3)) pri = 2;
       else if (f.cls === TKACH && this.sites.has(fk) && !this.starts.has(fk) && this.linked(f, w.anchors)) pri = 1;
       else if (f.cls === TKACH && this.shape.hunt >= 1 && this.inZone(f, w)) pri = 1;
       else if (f.cls === TKACH && this.shape.hunt >= 2) pri = 1;
+      if (pri && f.cls === TKACH && (this.foeSeen.get(f.id)?.still ?? 0) >= 1) pri += 0.5;
       if (pri) targets.push({ id: f.id, h: { q: f.q, r: f.r }, pri });
     }
     targets.sort((a, b) => b.pri - a.pri);
@@ -454,6 +548,7 @@ class ExpansionBot extends BlankBot implements Strategy {
     if (this.shape.raid) this.raid(obs, w, busy, out);
 
     const posts: Hex[] = [];
+    if (this.shape.wary) for (const h of working) posts.push(h);
     for (const k of this.hurt.keys()) posts.push(unkey(k));
     const lit = w.anchors.slice(1);
     lit.sort((a, b) => this.foeGap(a) - this.foeGap(b));
@@ -616,28 +711,34 @@ class ExpansionBot extends BlankBot implements Strategy {
       if (!this.linked(h, w.anchors) && !(isOrder && this.orderChain(h, orderKeys, w))) continue;
       let value = this.gain(h, w.cov, mult);
       if (o && o !== 'K') value *= 1.6;
+      if (this.shape.wary) value /= 1 + 2 * this.danger(h, w);
       out.set(k, { k, h, heat, value, prio, ring: ring && o === 'K' });
     }
 
     if (board && orderKeys.size) {
-      let ok = true;
-      let need = 0;
+      let ok = w.weavers.length > 0;
+      const etas: number[] = [];
       for (const k of orderKeys) {
+        if (!ok) break;
         if (w.litKeys.has(k)) continue;
         const c = out.get(k);
         if (w.mine.has(k) || !c) {
           ok = false;
           break;
         }
-        need++;
         let eta = Infinity;
         for (const u of w.weavers) eta = Math.min(eta, 2 * dist(u, c.h) + c.heat);
-        if (t + eta + this.holdTicks + 2 > board.to) {
-          ok = false;
-          break;
-        }
+        etas.push(eta);
       }
-      if (ok && need > 0 && need <= w.weavers.length) {
+      if (ok && etas.length) {
+        etas.sort((a, b) => a - b);
+        const par = Math.min(w.weavers.length, etas.length);
+        let span = etas[par - 1]!;
+        const extra = etas.length - par;
+        if (extra > 0) span = Math.max(span, etas[0]! + Math.ceil(extra / par) * (8 + this.heatRuin));
+        if (t + span + this.holdTicks + 2 > board.to) ok = false;
+      }
+      if (ok && etas.length > 0) {
         for (const k of orderKeys) {
           const c = out.get(k);
           if (c) {
@@ -674,6 +775,7 @@ class ExpansionBot extends BlankBot implements Strategy {
       if (!this.buildable.has(k) || this.isBlocked(k, t) || w.occupied.has(k) || claimed.has(k)) return;
       const h = { q, r };
       if (!w.free && dist(h, this.center) <= this.cherta) return;
+      if (this.shape.wary && w.energy < 300 && this.danger(h, w) >= 1) return;
       if (!this.linkOk(h, target) || !this.linked(h, w.anchors)) return;
       const s = dist(h, u) * 2 - this.gain(h, w.cov) / 10;
       if (s < bs) {
@@ -722,10 +824,12 @@ class ExpansionBot extends BlankBot implements Strategy {
         if (!this.buildable.has(k) || this.isBlocked(k, t) || w.occupied.has(k) || claimed.has(k)) return;
         const h = { q, r };
         if (!w.free && dist(h, this.center) <= this.cherta) return;
+        const risk = this.shape.wary ? this.danger(h, w) : 0;
+        if (risk >= 1 && w.energy < 300) return;
         if (!this.linked(h, w.anchors)) return;
         const g = this.gain(h, w.cov);
         if (g * this.rate * left < 1.5) return;
-        const s = g - 1.5 * dist(h, u);
+        const s = g - 1.5 * dist(h, u) - 10 * risk;
         if (s > bs) {
           bs = s;
           best = h;
@@ -736,6 +840,17 @@ class ExpansionBot extends BlankBot implements Strategy {
   }
 
   private weaverOrders(obs: Observe, t: number, w: World, moves: Order[], builds: Order[], feeds: Order[]): void {
+    for (const u of w.weavers) {
+      const rec = this.issued.get(u.id);
+      if (!rec || u.wait > 0 || (u.task?.path ?? 0) > 0 || u.task?.site) continue;
+      const here = key(u.q, u.r);
+      if (here === rec.dest) this.issued.delete(u.id);
+      else if (here === rec.pos && t - rec.t >= 6) {
+        this.blocked.set(rec.dest, Math.max(this.blocked.get(rec.dest) ?? 0, t + 100));
+        if (this.assign.get(u.id) === rec.dest) this.assign.delete(u.id);
+        this.issued.delete(u.id);
+      }
+    }
     const cands = this.candidates(obs, t, w);
     const alive = new Set(w.weavers.map((u) => u.id));
     for (const [id, k] of this.assign) {
@@ -918,12 +1033,20 @@ class ExpansionBot extends BlankBot implements Strategy {
     const builds: Order[] = [];
     const feeds: Order[] = [];
     this.yard(t, w, head);
+    this.bids(t, w, head);
     this.bladeOrders(obs, w, rams);
     this.weaverOrders(obs, t, w, moves, builds, feeds);
     let orders = [...head, ...rams, ...moves, ...builds, ...feeds];
     const cap = Math.floor(obs.pulse.chanAt / 32) + 4 - 1;
     if (orders.length > cap) orders = orders.slice(0, Math.max(1, cap));
     if (this.silent > 0 || orders.length === 0) orders.unshift({ kind: 'watch', q: this.base.q, r: this.base.r, keep: 0 });
+    const at = new Map<string, string>();
+    for (const u of w.weavers) at.set(u.id, key(u.q, u.r));
+    for (const o of orders) {
+      if (o.kind !== 'move' && o.kind !== 'needle') continue;
+      const pos = at.get(o.unit);
+      if (pos) this.issued.set(o.unit, { pos, dest: key(o.q, o.r), t });
+    }
     this.sent = orders;
     return orders;
   }

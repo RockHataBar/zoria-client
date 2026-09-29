@@ -59,6 +59,8 @@ function probe() {
         for (const e of o.events) {
           if (e.type === 'build' && e.p === slot) s.built[e.cls] = (s.built[e.cls] ?? 0) + 1;
           if (e.type === 'lost' && e.p === slot) s.lost[e.cls + ':' + e.why] = (s.lost[e.cls + ':' + e.why] ?? 0) + 1;
+          if (e.type === 'lost' && e.p === slot && (s.early ?? []).length < 12) (s.early ??= []).push(`${o.t}${e.cls === 'ткач' ? 'Т' : 'К'}@${e.q},${e.r}`);
+          if (e.type === 'build' && e.p === slot && (s.births ?? []).length < 12) (s.births ??= []).push(`${o.t}${e.cls === 'ткач' ? 'Т' : 'К'}`);
           if (e.type === 'ram' && e.p === slot) s.myRams++;
           if (e.type === 'ram' && e.tgt === slot && e.p !== slot) s.ramsOnMe++;
           if (e.type === 'jam' && e.own === slot && e.p !== slot) s.jamsOnMe++;
@@ -122,6 +124,7 @@ for (let x = 0; x < seeds; x++) {
     console.log(`    мої тарани ${st.myRams}, тарани по мені ${st.ramsOnMe} ${JSON.stringify(st.where)}, мої завади ${st.myJams}, завади по мені ${st.jamsOnMe}, без рук ${st.mute}`);
     console.log(`    замовлення:${st.boards ?? ''} | причини ${JSON.stringify(st.reasons ?? {})} | найдовше утримання ${st.maxHold ?? 0} | ставки${st.bids ?? ' -'}`);
     console.log(`    відмови ${JSON.stringify(st.deny)}`);
+    console.log(`    народження ${(st.births ?? []).join(' ')} | загибелі ${(st.early ?? []).join(' ')}`);
     if (st.dump) console.log('    машини:\n      ' + st.dump);
   });
 }

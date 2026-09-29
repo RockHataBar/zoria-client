@@ -18,7 +18,6 @@ export interface Strategy {
 interface Shape {
   weavers: number;
   blades: number;
-  reactive: boolean;
   steal: boolean;
   build: boolean;
   ring: boolean;
@@ -31,19 +30,14 @@ interface Shape {
   crown: boolean;
 }
 
-const BASE: Shape = { weavers: 3, blades: 2, reactive: false, steal: true, build: true, ring: true, hunt: 0, escort: false, raid: false, wary: false, adapt: false, bid: true, crown: true };
+const BASE: Shape = { weavers: 3, blades: 2, steal: true, build: true, ring: true, hunt: 0, escort: false, raid: false, wary: false, adapt: false, bid: true, crown: true };
 
 const SHAPES: Record<string, Shape> = {
   warden: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: true, wary: true },
   sentinel: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: true, wary: true, adapt: true },
-  ranger: { ...BASE, weavers: 2, blades: 4, hunt: 2, escort: true, raid: true, wary: true, adapt: true },
-  calm: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: false, wary: true },
-  still: { ...BASE, weavers: 2, blades: 4, hunt: 0, escort: true, raid: true, wary: true },
-  homely: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: true, wary: true, steal: false },
   raider: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true, raid: true },
-  guard: { ...BASE },
-  pack: { ...BASE, weavers: 2, blades: 4, hunt: 1, escort: true },
   swarm: { ...BASE, weavers: 1, blades: 6, hunt: 2, escort: true, raid: true },
+  guard: { ...BASE },
   expansion: { ...BASE, weavers: 4, blades: 0 },
 };
 const DEFAULT_SHAPE = 'warden';
@@ -452,18 +446,16 @@ class ExpansionBot extends BlankBot implements Strategy {
     return this.siege() ? Math.max(1, this.shape.weavers - 1) : this.shape.weavers;
   }
 
-  private wantBlades(t: number): number {
+  private wantBlades(): number {
     if (!this.shape.blades) return 0;
-    const n = this.siege() ? this.shape.blades + 2 : this.shape.blades;
-    if (!this.shape.reactive) return n;
-    return t - this.threat < 300 ? n : 0;
+    return this.siege() ? this.shape.blades + 2 : this.shape.blades;
   }
 
   private yard(t: number, w: World, out: Order[]): void {
     if (t < this.lastYard + 6) return;
     const weavers = w.weavers.length;
     const blades = w.blades.length;
-    const want = this.wantBlades(t);
+    const want = this.wantBlades();
     const first = this.shape.wary && t - this.threat < 200 ? Math.min(2, want) : 0;
     const canWeaver = w.weight + 2 <= this.capWeight && w.energy >= this.costTkach;
     const canBlade = w.weight + 1 <= this.capWeight && w.energy >= this.costKlinok;
@@ -521,7 +513,7 @@ class ExpansionBot extends BlankBot implements Strategy {
   private reserve(t: number, w: World): number {
     const lot = this.lotSoon(t, w) ? 65 : 0;
     if (w.weavers.length < this.wantWeavers()) return this.costTkach + lot;
-    if (w.blades.length < this.wantBlades(t)) return this.costKlinok + lot;
+    if (w.blades.length < this.wantBlades()) return this.costKlinok + lot;
     return lot;
   }
 
@@ -746,7 +738,9 @@ class ExpansionBot extends BlankBot implements Strategy {
       if (!this.linked(h, w.anchors) && !(isOrder && this.orderChain(h, orderKeys, w))) continue;
       let value = this.gain(h, w.cov, mult);
       if (o && o !== 'K') value *= 1.6;
-      if (this.shape.wary) value /= 1 + 2 * this.danger(h, w);
+      if (this.shape.wary) {
+        value /= 1 + 2 * this.danger(h, w);
+      }
       out.set(k, { k, h, heat, value, prio, ring: ring && o === 'K' });
     }
 

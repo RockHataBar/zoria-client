@@ -11,7 +11,7 @@
                    встановленого @zoria/engine. Чужий хеш - бот рве
                    провід сам: грати не в той світ гірше, ніж не грати
      ZARIA_BELIEF  файл щоденника віри (NDJSON); порожньо - не писати
-     ZARIA_PRESET  архетип заглушки (рівний)
+     ZARIA_PRESET  пресет стратегії (warden)
      ZARIA_FREEZE  1 - здачу заморожено: зміна пресета відповідає відмовою
      ZARIA_AGENT   ім'я агента в присязі (zaria-bot)
      STATUS_PORT   внутрішній службовий порт (status.ts); порожньо - без нього
@@ -47,7 +47,8 @@ const beliefFile = env['ZARIA_BELIEF'] ?? '';
 const statusPort = Number(env['STATUS_PORT'] ?? '') || 0;
 const freeze = env['ZARIA_FREEZE'] === '1';
 
-let preset = env['ZARIA_PRESET'] || presets()[0]!;
+const wanted = env['ZARIA_PRESET'] ?? '';
+let preset = presets().includes(wanted) ? wanted : presets()[0]!;
 let strategy = createStrategy(preset);
 
 /* знімок голови: усе, що про бій знає лише провід. Його читає службовий

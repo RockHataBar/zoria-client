@@ -3,7 +3,7 @@
 .git
 **/node_modules
 **/dist
-records
+**/records
 *.log
 preflight.json
 hq-report.json

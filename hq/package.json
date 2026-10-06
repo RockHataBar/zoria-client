@@ -8,7 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "node build.mjs",
+    "build": "vite build",
     "check": "npm run build && zaria-kit hq-check"
   },
   "zaria": {
@@ -16,6 +16,8 @@
     "lang": "uk"
   },
   "devDependencies": {
-    "@zoria/kit": "^1.1.2"
+    "@zoria/kit": "^1.1.2",
+    "vite": "^8.3.3",
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }

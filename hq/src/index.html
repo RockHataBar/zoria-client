@@ -3,125 +3,154 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="data:," />
     <title>Зоря - штаб</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <header class="head">
-      <b class="mark">ЗОРЯ</b>
-      <span class="lab" data-t="pack">запис</span>
-      <b class="val" id="packName">-</b>
-      <span class="lab" data-t="match">партія</span>
-      <b class="val" data-zaria="match"></b>
-      <span class="lab" data-t="tick">такт</span>
-      <b class="val" data-zaria="tick"></b>
-      <span class="lab" data-t="mode">шар</span>
-      <b class="val" data-zaria="mode"></b>
-      <span class="lab" data-t="focus">фокус</span>
-      <b class="val" data-zaria="focus"></b>
+      <b class="mark" data-t="brand">ЗОРЯ</b>
+      <span class="chip"><span class="lab" data-t="pack">запис</span><b id="packName">-</b></span>
+      <span class="chip"><span class="lab" data-t="match">партія</span><b data-zaria="match"></b></span>
+      <span class="chip"><span class="lab" data-t="tick">такт</span><b data-zaria="tick"></b><span class="dim" id="tickMax"></span></span>
+      <span class="chip"><span class="lab" data-t="mode">шар</span><b data-zaria="mode"></b></span>
+      <span class="chip"><span class="lab" data-t="focus">фокус</span><b data-zaria="focus" id="focusName"></b></span>
       <span class="grow"></span>
-      <span class="lab" data-t="live">ефір</span>
-      <b class="val" data-zaria="live-state"></b>
-      <span class="lab" data-t="lag">відставання</span>
-      <b class="val" data-zaria="live-lag"></b>
+      <span class="chip"><span class="lab" data-t="live">ефір</span><b data-zaria="live-state"></b></span>
+      <span class="chip"><span class="lab" data-t="lag">відставання</span><b data-zaria="live-lag"></b></span>
     </header>
 
-    <main class="info">
-      <section class="pane">
-        <h2 data-t="field">Поле: правда і віра</h2>
-        <p class="hint" data-t="fieldHint">
-          Тут буде мапа долини. Заготовка малює лише якорі - мапу, шари і
-          вибір комірки пишете ви.
-        </p>
-        <dl class="grid">
-          <dt data-t="cell">комірка</dt>
-          <dd class="val" data-zaria="cell"></dd>
-          <dt data-t="ownerTruth">голка за правдою</dt>
-          <dd class="val" data-zaria="cell-owner-truth"></dd>
-          <dt data-t="ownerBelief">голка за вірою</dt>
-          <dd class="val" data-zaria="cell-owner-belief"></dd>
-          <dt data-t="ghost">пам'ять про машину</dt>
-          <dd class="val" data-zaria="ghost-cell"></dd>
-          <dt data-t="ghostAge">вік пам'яті</dt>
-          <dd class="val" data-zaria="ghost-age"></dd>
-          <dt data-t="diff">розбіжностей</dt>
-          <dd class="val" data-zaria="diff-count"></dd>
-          <dt data-t="dark">мовчазних голок за вірою</dt>
-          <dd class="val" data-zaria="dark-count"></dd>
-        </dl>
+    <div class="status" id="status" hidden></div>
+
+    <main class="layout">
+      <section class="stage">
+        <div class="mapbox"><canvas id="map"></canvas></div>
+        <div class="timeline">
+          <button type="button" id="play" class="btn" data-t="play">пуск</button>
+          <select id="speed" class="speed">
+            <option value="1">x1</option>
+            <option value="4" selected>x4</option>
+            <option value="16">x16</option>
+          </select>
+          <input type="range" id="tickRange" min="0" max="0" step="1" value="0" />
+          <button type="button" id="toCap" class="btn" data-t="toCap" hidden>до стелі</button>
+        </div>
+        <div class="legend">
+          <span><i class="sw sw-a"></i><b id="legA">A</b></span>
+          <span><i class="sw sw-b"></i><b id="legB">B</b></span>
+          <span><i class="sw sw-c"></i><b id="legC">C</b></span>
+          <span><i class="sw sw-k"></i>K</span>
+          <span class="dim" data-t="legendLit">точка - голка горить</span>
+          <span class="dim" data-t="legendDark">пунктир - мовчання за вірою</span>
+          <span class="dim" data-t="legendGhost">кільце - пам'ять про чужу машину</span>
+          <span class="dim" data-t="legendBoth">обидва: зовні правда, всередині віра, червона рамка - розбіжність</span>
+        </div>
       </section>
 
-      <section class="pane">
-        <h2 data-t="chan">Канал і рахунок</h2>
-        <dl class="grid">
-          <dt data-t="score">рахунок фокуса</dt>
-          <dd class="val" data-zaria="score"></dd>
-          <dt data-t="needles">голок горить</dt>
-          <dd class="val" data-zaria="needles"></dd>
-          <dt data-t="bytes">байтів у кадрі</dt>
-          <dd class="val" data-zaria="bytes"></dd>
-          <dt data-t="orders">наказів подано</dt>
-          <dd class="val" data-zaria="orders"></dd>
-          <dt data-t="denied">відхилено</dt>
-          <dd class="val" data-zaria="denied"></dd>
-          <dt data-t="denyWord">причина відмови</dt>
-          <dd class="val" data-zaria="deny-word"></dd>
-          <dt data-t="denyTop">такт із піком відмов</dt>
-          <dd class="val" data-zaria="deny-top-tick"></dd>
-          <dt data-t="shares">частки пакета</dt>
-          <dd class="val" data-zaria="shares"></dd>
-        </dl>
+      <section class="side">
+        <div class="pane">
+          <h2 data-t="board">Рахунок</h2>
+          <table class="board" id="board">
+            <tbody></tbody>
+          </table>
+          <dl class="grid">
+            <dt data-t="score">рахунок фокуса</dt>
+            <dd data-zaria="score"></dd>
+            <dt data-t="needles">голок горить</dt>
+            <dd data-zaria="needles"></dd>
+            <dt data-t="shares">частки</dt>
+            <dd data-zaria="shares"></dd>
+            <dt data-t="keeper">голок Ключника</dt>
+            <dd id="keeper"></dd>
+          </dl>
+          <div class="pulse" id="pulse"></div>
+        </div>
+
+        <div class="pane">
+          <h2 data-t="cellBox">Сота і пам'ять</h2>
+          <dl class="grid">
+            <dt data-t="cell">сота</dt>
+            <dd data-zaria="cell"></dd>
+            <dt data-t="ownerTruth">голка за правдою</dt>
+            <dd data-zaria="cell-owner-truth"></dd>
+            <dt data-t="ownerBelief">голка за вірою</dt>
+            <dd data-zaria="cell-owner-belief"></dd>
+            <dt data-t="unit">машина</dt>
+            <dd id="unitName"></dd>
+            <dt data-t="ghost">де за вірою</dt>
+            <dd data-zaria="ghost-cell"></dd>
+            <dt data-t="ghostAge">вік пам'яті</dt>
+            <dd data-zaria="ghost-age"></dd>
+            <dt data-t="diff">розбіжностей</dt>
+            <dd data-zaria="diff-count"></dd>
+            <dt data-t="dark">мовчить голок</dt>
+            <dd data-zaria="dark-count"></dd>
+          </dl>
+        </div>
+
+        <div class="pane">
+          <h2 data-t="chan">Канал</h2>
+          <div class="sparkbox"><canvas id="spark"></canvas></div>
+          <dl class="grid">
+            <dt data-t="bytes">байтів у кадрі</dt>
+            <dd data-zaria="bytes"></dd>
+            <dt data-t="orders">команд подано</dt>
+            <dd data-zaria="orders"></dd>
+            <dt data-t="denied">відхилено</dt>
+            <dd data-zaria="denied"></dd>
+            <dt data-t="denyWord">причина відмови</dt>
+            <dd data-zaria="deny-word"></dd>
+            <dt data-t="denyTop">пік відмов</dt>
+            <dd data-zaria="deny-top-tick"></dd>
+          </dl>
+          <ol class="orders" id="orderList" start="0"></ol>
+        </div>
+
+        <div class="pane">
+          <h2 data-t="ab">Пресети</h2>
+          <dl class="grid">
+            <dt data-t="abWinner">краще за мережею</dt>
+            <dd data-zaria="ab-winner"></dd>
+            <dt data-t="abDiff">різниця рахунку</dt>
+            <dd data-zaria="ab-diff"></dd>
+            <dt data-t="abTop">стаття розбіжності</dt>
+            <dd data-zaria="ab-top"></dd>
+            <dt data-t="promote">відповідь на промоут</dt>
+            <dd data-zaria="promote-status"></dd>
+          </dl>
+          <table class="ab" id="abTable"></table>
+        </div>
       </section>
 
-      <section class="pane">
-        <h2 data-t="ab">Порівняння пресетів</h2>
-        <dl class="grid">
-          <dt data-t="abWinner">краще за хвилинами мережі</dt>
-          <dd class="val" data-zaria="ab-winner"></dd>
-          <dt data-t="abDiff">різниця рахунку</dt>
-          <dd class="val" data-zaria="ab-diff"></dd>
-          <dt data-t="abTop">стаття розбіжності</dt>
-          <dd class="val" data-zaria="ab-top"></dd>
-          <dt data-t="promote">відповідь на промоут</dt>
-          <dd class="val" data-zaria="promote-status"></dd>
-        </dl>
-      </section>
+      <aside class="act">
+        <h2 data-t="organs">Керування</h2>
+        <label><span data-t="oPack">запис</span><select data-zaria="go-pack"></select></label>
+        <label><span data-t="oMatch">партія</span>
+          <select data-zaria="go-match">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </label>
+        <label><span data-t="oTick">такт</span><input type="number" data-zaria="go-tick" min="0" value="0" /></label>
+        <label><span data-t="oMode">шар</span>
+          <select data-zaria="go-mode">
+            <option value="truth">truth</option>
+            <option value="belief">belief</option>
+            <option value="both">both</option>
+          </select>
+        </label>
+        <label><span data-t="oFocus">фокус</span><select data-zaria="go-focus"></select></label>
+        <label><span data-t="oCell">сота</span><input type="text" data-zaria="go-cell" placeholder="q,r" autocomplete="off" /></label>
+        <label><span data-t="oUnit">машина</span><input type="text" data-zaria="go-unit" list="unitList" placeholder="K-1" autocomplete="off" /></label>
+        <datalist id="unitList"></datalist>
+        <label><span data-t="oOrder">команда</span><input type="number" data-zaria="go-order" min="0" value="0" /></label>
+        <label><span data-t="oPreset">пресет</span><input type="text" data-zaria="go-preset" list="presetList" autocomplete="off" /></label>
+        <datalist id="presetList"></datalist>
+        <button type="button" class="btn wide" data-zaria="do-promote" data-t="oPromote">перевести в бій</button>
+        <label class="file" id="openBox" hidden><span data-t="open">відкрити теку запису</span><input type="file" id="openFiles" multiple /></label>
+      </aside>
     </main>
-
-    <aside class="act">
-      <h2 data-t="organs">Органи</h2>
-      <label><span data-t="oPack">запис</span><select data-zaria="go-pack"></select></label>
-      <label><span data-t="oMatch">партія</span>
-        <select data-zaria="go-match">
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-        </select>
-      </label>
-      <label><span data-t="oTick">такт</span>
-        <input type="range" id="tickRange" min="0" max="0" step="1" value="0" />
-        <input type="number" data-zaria="go-tick" min="0" value="0" />
-      </label>
-      <label><span data-t="oMode">шар</span>
-        <select data-zaria="go-mode">
-          <option value="truth">truth</option>
-          <option value="belief">belief</option>
-          <option value="both">both</option>
-        </select>
-      </label>
-      <label><span data-t="oFocus">фокус</span><select data-zaria="go-focus"></select></label>
-      <label><span data-t="oCell">комірка</span><input type="text" data-zaria="go-cell" placeholder="q,r" /></label>
-      <label><span data-t="oUnit">машина</span><input type="text" data-zaria="go-unit" placeholder="K-K1" /></label>
-      <label><span data-t="oOrder">наказ</span><input type="number" data-zaria="go-order" min="0" value="0" /></label>
-      <label><span data-t="oPreset">пресет</span>
-        <select data-zaria="go-preset">
-          <option value="рівний">рівний</option>
-          <option value="обхідник">обхідник</option>
-        </select>
-      </label>
-      <button data-zaria="do-promote" data-t="oPromote">перевести в бій</button>
-      <p class="hint" id="note"></p>
-    </aside>
 
     <script type="module" src="./hq.js"></script>
   </body>

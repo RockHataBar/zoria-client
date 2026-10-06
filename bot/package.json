@@ -19,14 +19,14 @@
     "lang": "uk"
   },
   "dependencies": {
-    "@zoria/engine": "^1.0.1",
-    "@zoria/nakaz": "^1.0.1",
-    "@zoria/protocol": "^1.0.1",
-    "@zoria/sdk": "^1.0.1"
+    "@zoria/engine": "^1.1.2",
+    "@zoria/nakaz": "^1.1.2",
+    "@zoria/protocol": "^1.1.2",
+    "@zoria/sdk": "^1.1.2"
   },
   "devDependencies": {
     "@types/node": "24.3.0",
-    "@zoria/kit": "^1.0.1",
+    "@zoria/kit": "^1.1.2",
     "typescript": "7.0.2"
   }
 }

@@ -11,3 +11,7 @@ dist/
 # Локальні налаштування Claude Code
 .claude/
 .zoria-registry*
+records/
+preflight.json
+hq-report.json
+.zaria-preflight/

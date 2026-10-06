@@ -13,10 +13,11 @@ const session = {
   user: { id: 'u1', username: 'north', displayName: 'Північна вахта', role: 'participant', disabled: false, createdAt: '2026-09-24T09:00:04.311Z', lang: 'uk' },
 };
 
+const pw = 'correct-horse-battery';
 const app: Application = {
   username: 'North',
   displayName: 'Північна вахта',
-  password: '<redacted>',
+  password: pw,
   invitation: 'CODE-1',
   repositoryUrl: 'https://github.com/north/zoria-client',
   lang: 'uk',

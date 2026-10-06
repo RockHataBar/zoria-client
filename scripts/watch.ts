@@ -51,7 +51,8 @@ async function collect(): Promise<Application> {
     };
     const confirm = await ask('Повторіть пароль: ', true);
     const errs = validateApplication(app);
-    if (confirm !== app.password) errs.password = '<redacted>';
+    const mismatch = 'Паролі не збігаються.';
+    if (confirm !== app.password) errs.password = mismatch;
     if (!Object.keys(errs).length) return app;
     for (const [k, v] of Object.entries(errs)) console.log(`  ${k}: ${v}`);
     console.log('Спробуймо ще раз.\n');

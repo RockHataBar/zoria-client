@@ -72,10 +72,11 @@ describe('поля заявки (5.6)', () => {
     expect(checkPassword('x'.repeat(257))).not.toBeNull();
   });
   it('тіло реєстрації: тільки поля контракту, логін у нижньому регістрі', () => {
+    const spaced = ' pass with spaces ';
     const body = registerBody({
       username: ' North ',
       displayName: ' Північна вахта ',
-      password: '<redacted>',
+      password: spaced,
       invitation: ' CODE-1 \n',
       repositoryUrl: 'https://github.com/North/zoria-client.git',
       lang: 'uk',
@@ -83,7 +84,7 @@ describe('поля заявки (5.6)', () => {
     expect(body).toEqual({
       username: 'north',
       displayName: 'Північна вахта',
-      password: '<redacted>',
+      password: spaced,
       invitation: 'CODE-1',
       repositoryUrl: 'North/zoria-client',
       lang: 'uk',

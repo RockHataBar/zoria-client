@@ -100,6 +100,17 @@ npx zaria-kit preflight                      # передстартовий пр
 і `npx zaria-kit hq-check` у каталозі `hq`. У стеку штаб - сервіс `hq` з міткою `zaria.hq`, локально на
 `http://127.0.0.1:8180`. Докладніше про стек - `STACK.md`, про штаб - `hq/README.md`.
 
+Перед кожним пушем працює хук `.githooks/pre-push`: сканер секретів [gitleaks](https://github.com/gitleaks/gitleaks)
+перевіряє коміти, які йдуть на сервер, і зупиняє пуш, якщо щось знайде (вимога P4-06). Увімкнути один раз
+після клонування:
+
+```bash
+winget install Gitleaks.Gitleaks      # або brew install gitleaks
+git config core.hooksPath .githooks
+```
+
+Відомі тестові значення, які не є секретами, перелічено в `.gitleaksignore`.
+
 ## Будова
 
 ```

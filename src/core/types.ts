@@ -167,3 +167,36 @@ export interface Page<T> {
   items: T[];
   nextOffset: number | null;
 }
+
+export interface StackCheck {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface StackVerdict {
+  id: string;
+  sha: string;
+  digest: string;
+  at: string;
+  ok: boolean;
+  checks: StackCheck[];
+}
+
+export interface StackSubmission {
+  kind: string;
+  auto: boolean;
+  requestedAt: string | null;
+  sha: string | null;
+  state: string;
+}
+
+export interface StackView {
+  status: 'ok' | 'failed' | 'none';
+  latest: StackVerdict | null;
+  history: StackVerdict[];
+  nextGameAt: string | null;
+  window: { id: string; title: string; freezeAt: string | null; retryUntil: string | null; phase: string } | null;
+  submissions: StackSubmission[];
+  retry: { available: boolean; used: boolean; until: string | null } | null;
+}

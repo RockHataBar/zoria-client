@@ -8,6 +8,7 @@ import {
   asPage,
   asRepositoryEnvelope,
   asSession,
+  asStack,
   asStage,
   asStageSummary,
   asSummary,
@@ -25,6 +26,7 @@ import type {
   Page,
   Repository,
   Session,
+  StackView,
   Stage,
   StageSummary,
   Summary,
@@ -117,6 +119,7 @@ export function createApi(base: string, opts: ApiOptions = {}) {
     stage: (token: string, stageId: string) => call<Stage>('GET', `/stages/${id(stageId)}`, stageOf, { token }),
     ackStage: (token: string, stageId: string) =>
       call<Stage>('POST', `/stages/${id(stageId)}/ack`, stageOf, { body: {}, token }),
+    stack: (token: string) => call<StackView>('GET', '/me/stack', asStack, { token }),
     developerCheck: (token: string, echo: string) =>
       call<DeveloperCheck>('POST', '/developer/check', asDeveloperCheck, { body: { echo }, token }),
   };

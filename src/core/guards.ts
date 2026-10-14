@@ -9,6 +9,10 @@ import type {
   Page,
   Repository,
   Session,
+  StackCheck,
+  StackSubmission,
+  StackVerdict,
+  StackView,
   Stage,
   StageSummary,
   Summary,
@@ -195,6 +199,60 @@ export function asPage<T>(v: unknown, item: (x: unknown) => T | null): Page<T> |
     if (it) items.push(it);
   }
   return { items, nextOffset: v.nextOffset };
+}
+
+function asStackCheck(v: unknown): StackCheck | null {
+  if (!isObj(v) || !str(v.name) || !bool(v.ok)) return null;
+  return { name: v.name, ok: v.ok, detail: str(v.detail) ? v.detail : '' };
+}
+
+function asStackVerdict(v: unknown): StackVerdict | null {
+  if (!isObj(v) || !bool(v.ok)) return null;
+  const checks = Array.isArray(v.checks) ? v.checks.map(asStackCheck).filter((c): c is StackCheck => c !== null) : [];
+  return {
+    id: str(v.id) ? v.id : '',
+    sha: str(v.sha) ? v.sha : '',
+    digest: str(v.digest) ? v.digest : '',
+    at: time(v.at) ? v.at : '',
+    ok: v.ok,
+    checks,
+  };
+}
+
+function asStackSubmission(v: unknown): StackSubmission | null {
+  if (!isObj(v) || !str(v.kind) || !str(v.state)) return null;
+  return {
+    kind: v.kind,
+    auto: v.auto === true,
+    requestedAt: timeOrNull(v.requestedAt) ? v.requestedAt : null,
+    sha: strOrNull(v.sha) ? v.sha : null,
+    state: v.state,
+  };
+}
+
+export function asStack(v: unknown): StackView | null {
+  if (!isObj(v) || !(v.status === 'ok' || v.status === 'failed' || v.status === 'none')) return null;
+  const submit = isObj(v.submit) ? v.submit : null;
+  const w = submit && isObj(submit.window) ? submit.window : null;
+  const r = submit && isObj(submit.retry) ? submit.retry : null;
+  const subs = submit && Array.isArray(submit.submissions) ? submit.submissions : [];
+  return {
+    status: v.status,
+    latest: asStackVerdict(v.latest),
+    history: Array.isArray(v.history) ? v.history.map(asStackVerdict).filter((h): h is StackVerdict => h !== null) : [],
+    nextGameAt: timeOrNull(v.nextGameAt) ? v.nextGameAt : null,
+    window: w
+      ? {
+          id: str(w.id) ? w.id : '',
+          title: str(w.title) ? w.title : '',
+          freezeAt: timeOrNull(w.freezeAt) ? w.freezeAt : null,
+          retryUntil: timeOrNull(w.retryUntil) ? w.retryUntil : null,
+          phase: str(w.phase) ? w.phase : '',
+        }
+      : null,
+    submissions: subs.map(asStackSubmission).filter((s): s is StackSubmission => s !== null),
+    retry: r ? { available: r.available === true, used: r.used === true, until: timeOrNull(r.until) ? r.until : null } : null,
+  };
 }
 
 export function asItems<T>(v: unknown, item: (x: unknown) => T | null): T[] | null {

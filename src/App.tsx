@@ -12,6 +12,7 @@ import { NewsPanel } from './ui/NewsPanel.tsx';
 import { RegisterPanel } from './ui/RegisterPanel.tsx';
 import { RollPanel } from './ui/RollPanel.tsx';
 import { SettingsPanel } from './ui/SettingsPanel.tsx';
+import { StackPanel } from './ui/StackPanel.tsx';
 import { StagesPanel } from './ui/StagesPanel.tsx';
 
 export function App() {
@@ -34,6 +35,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'inbox', label: 'Листи' },
   { id: 'news', label: 'Новини' },
   { id: 'stages', label: 'Частини' },
+  { id: 'stack', label: 'Стек' },
   { id: 'roll', label: 'Журнал' },
   { id: 'settings', label: 'Налаштування' },
 ];
@@ -118,6 +120,7 @@ function Shell() {
         {tab === 'inbox' && <InboxPanel />}
         {tab === 'news' && <NewsPanel />}
         {tab === 'stages' && <StagesPanel />}
+        {tab === 'stack' && <StackPanel />}
         {tab === 'roll' && <RollPanel />}
         {tab === 'settings' && <SettingsPanel />}
       </main>

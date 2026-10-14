@@ -6,7 +6,7 @@ import { asSession } from '../core/guards.ts';
 import { serverNowMs } from '../core/ether.ts';
 import type { Session } from '../core/types.ts';
 
-export type Tab = 'ether' | 'register' | 'access' | 'inbox' | 'news' | 'stages' | 'roll' | 'settings';
+export type Tab = 'ether' | 'register' | 'access' | 'inbox' | 'news' | 'stages' | 'stack' | 'roll' | 'settings';
 
 export interface AppCtx {
   server: ServerSetting;

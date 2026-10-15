@@ -12,7 +12,9 @@
     "start": "node dist/main.js",
     "play": "npm run build && zaria-kit pack",
     "lint:nakaz": "zaria-kit lint nakaz.yaml",
-    "check": "npm run build && zaria-kit lint nakaz.yaml"
+    "check": "npm run build && zaria-kit lint nakaz.yaml",
+    "pretest": "npm run build",
+    "test": "node --test \"dist/**/*.test.js\""
   },
   "zaria": {
     "bot": "node dist/main.js",

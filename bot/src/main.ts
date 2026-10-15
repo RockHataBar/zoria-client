@@ -33,6 +33,7 @@ import { withJitter } from './jitter.js';
 import { createStrategy, presets } from './strategy.js';
 import { Refusal, statusServer } from './status.js';
 import type { Head, HeadStats } from './status.js';
+import { thinkStats } from './stats.js';
 
 const log = (line: string): void => {
   process.stdout.write(line + '\n');
@@ -169,8 +170,7 @@ if (!url || !token) {
     log('місце ' + run.slot + ', тактів ' + run.ack.ticks + ', рушій ' + run.ack.engine.slice(0, 12));
     why = await run.done;
     phase = 'done';
-    const sorted = [...think].sort((a, b) => a - b);
-    const q = (p: number): string => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor((sorted.length * p) / 100))]!.toFixed(1) : '0');
+    const s = thinkStats(think);
     log(
       'партію закінчено (' +
         why +
@@ -181,11 +181,11 @@ if (!url || !token) {
         ', повернень ' +
         run.stats.resumes +
         '; дума, мс: p50 ' +
-        q(50) +
+        s.p50 +
         ', p99 ' +
-        q(99) +
+        s.p99 +
         ', max ' +
-        q(100),
+        s.max,
     );
     if (!server) process.exit(0);
   }

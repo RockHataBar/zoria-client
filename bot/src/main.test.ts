@@ -142,6 +142,9 @@ test('справжній провід: локальний пакет із про
     });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /відповідей 300, кидків 0, повернень 0/);
+    const thinks = [...r.stdout.matchAll(/дума, мс: p50 ([\d.]+), p99 ([\d.]+), max ([\d.]+)/g)].map((m) => m.slice(1).map(Number));
+    assert.equal(thinks.length, 3);
+    for (const [p50, p99, max] of thinks) assert.ok(p50! > 0 && p50! <= p99! && p99! <= max! && max! < 400, `${p50} ${p99} ${max}`);
     const dir = join(out, readdirSync(out).find((n) => n.startsWith('pack-'))!);
     const pack = JSON.parse(readFileSync(join(dir, 'pack.json'), 'utf8')) as { shares: number[]; absent: boolean[][]; matches: { sha256: string }[] };
     assert.deepEqual(pack.shares, [9, 4, 5]);

@@ -60,6 +60,8 @@ export function StackPanel() {
   const [view, setView] = useState<StackView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [armed, setArmed] = useState(false);
+  const [retryNote, setRetryNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,6 +79,20 @@ export function StackPanel() {
   useEffect(() => {
     if (session) void load();
   }, [session, load]);
+
+  const retry = useCallback(async () => {
+    if (!armed) {
+      setArmed(true);
+      return;
+    }
+    setArmed(false);
+    const r = await authed((t) => api.stackRetry(t));
+    if (!r) return;
+    if (r.kind === 'ok') setRetryNote('Перездачу запрошено: знімаємо HEAD гілки і женемо прогін.');
+    else if (r.kind === 'error') setRetryNote(r.code === 'retry-used' ? 'Перездачу вже використано.' : r.code === 'no-retry-window' ? 'Зараз немає вікна перездачі.' : describeError(r.code, r.status));
+    else setRetryNote('Сервер не відповів як слід - спробуйте ще раз.');
+    void load();
+  }, [armed, api, authed, load]);
 
   if (!session) {
     return (
@@ -127,6 +143,14 @@ export function StackPanel() {
                 .
               </p>
             )}
+            {view.retry?.available && !view.retry.used && view.window?.phase === 'retry' && (
+              <p>
+                <button type="button" className={armed ? 'small warn' : 'small'} onClick={() => void retry()}>
+                  {armed ? 'Точно? Перездача одна - натисніть ще раз' : 'Запросити перездачу'}
+                </button>
+              </p>
+            )}
+            {retryNote && <p className="hint-box">{retryNote}</p>}
             {view.submissions.length > 0 && (
               <ul>
                 {view.submissions.map((s, i) => (

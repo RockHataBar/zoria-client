@@ -120,6 +120,7 @@ export function createApi(base: string, opts: ApiOptions = {}) {
     ackStage: (token: string, stageId: string) =>
       call<Stage>('POST', `/stages/${id(stageId)}/ack`, stageOf, { body: {}, token }),
     stack: (token: string) => call<StackView>('GET', '/me/stack', asStack, { token }),
+    stackRetry: (token: string) => call<Record<string, unknown>>('POST', '/me/stack/retry', (j) => (isObj(j) ? j : null), { body: {}, token }),
     developerCheck: (token: string, echo: string) =>
       call<DeveloperCheck>('POST', '/developer/check', asDeveloperCheck, { body: { echo }, token }),
   };
